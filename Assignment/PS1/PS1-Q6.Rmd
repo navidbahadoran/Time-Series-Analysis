@@ -1,0 +1,142 @@
+---
+title: "PS1-Q6"
+output: pdf_document
+date: "2025-02-03"
+---
+## (Computer Exercise) In this exercise, let us examine the stock returns of Walmart, Inc.(WMT) from 2010 to 2019. The data can be obtained from Yahoo Finance using the quantmod package in R. You need to install the package (install.packages(”quantmod”)) if you are using it for the first time. Once it is installed, you can load it into your current R session by library(quantmod), and then retrieve the data by getSymbols(”WMT”, src="yahoo", from = "2010-01-01", to = "2019-12-1")
+
+
+```{r}
+library('quantmod')
+```
+
+```{r}
+getSymbols("WMT", from="2010-01-01", to="2019-12-31",
+           src="yahoo", auto.assign=TRUE)
+```
+
+## (a) How many variables and observations are in the WMT data?
+
+```{r}
+dim(WMT)
+```
+`There are 6 variable and 2515 samples`
+
+```{r}
+names(WMT)
+```
+## (b) Consider the daily close prices. You can retrieve the close prices by p<-WMT$WMT.Close Draw the time series plot of the close prices. Does it look like a stationary series? Plot the ACF of p and find the values of the first four lags (i.e., $\rho_{1}$, ..., $\rho_{1}$). Do you find strong serial dependence in the share price?
+```{r}
+p<-WMT$WMT.Close
+plot(p)
+```
+
+```{r}
+chartSeries(WMT,theme = "white")
+```
+
+From The above charts we can conclude that the time series is not stationary as we see increasing trend in prices
+
+```{r}
+acf(p, lag=4, plot = FALSE)
+```
+
+```{r}
+acf(p, lag=4)
+```
+
+As we can see the fist 4 autocorrelations are very close too one which is showing strong serial dependence
+
+## (c) Generate daily log returns (also known as continuously compounded returns) by rd<-diff(log(p))and remove missing values. Examine the rd series by answering the same questions as in part (b).
+
+```{r}
+rd<-diff(log(p))
+rd<- rd[!is.na(rd)]
+rd
+```
+
+```{r echo=FALSE}
+plot(rd)
+```
+
+
+```{r echo=FALSE}
+chartSeries(rd, theme = "white")
+
+```
+
+
+```{r}
+acf(rd,lag=4, plot=FALSE)
+```
+```{r}
+acf(rd, lag=4)
+```
+As we can see now the log return of Walmart prices is exhibiting stationary time series. Autocorrelation values are dumping, starting from lag one.
+
+## d) Inspect a snippet of your data by printing the first 5 observations of rd. (The R function is head().) Report the mean, median, and standard deviation of rd (over the entire sample period).
+```{r}
+head(rd,5)
+
+```
+```{r}
+mean(rd)
+```
+
+
+```{r}
+median(rd)
+```
+
+```{r}
+sd(rd)
+
+```
+## (e) Since rd is stored as an xts object, it is easy to calculate weekly and monthly log returns using the built-in functions rw<-apply.weekly(rd, FUN = sum) rm <-apply.monthly(rd, FUN = sum) (Refer to the help documentation for details about the above functions.)
+## i. How many observations do you have on rw and rm?
+```{r}
+rw<-apply.weekly(rd, FUN = sum)
+rm<-apply.monthly(rd, FUN = sum)
+```
+```{r}
+length(rw)
+```
+```{r}
+length(rm)
+```
+Number off observation in rw is 522 and in rm is 120 which is reasonable for 10 years of daily data.
+
+## ii. Draw the time series plots of daily, weekly and monthly returns in one figure by arranging them in 3 rows and 1 column. Name the three plots as “daily returns”, “weekly returns”, and “monthly returns”, respectively. (In R you can use par(mfrow = c(3, 1)) before plot() to combine plots, and use par(mfrow = c(1, 1)) to restore the plotting arrangement to its original state. You can change the main title of a plot by the main option.)
+```{r}
+par(mfrow=c(3,1))
+plot(rd, main = "Daily Return")
+plot(rw, main = "Weekly Return")
+plot(rm, main="Monthly Return")
+```
+
+## iii. Plot the ACFs of rw and rm (in separate figures).
+```{r}
+acf(rw, main="Weekly Return")
+```
+```{r}
+acf(rm, main="Monthly Return")
+```
+
+## iv. Conduct the Ljung–Box tests using 10 lags on the daily, weekly, and monthly returns, respectively. Write down the null and alternative hypotheses. Draw your conclusion.
+```{r}
+Box.test(rd, lag=10, type='Ljung')
+```
+Null hypothesis is $H_{0}$:$\rho(1)=\rho(2)=...=\rho(m)=0$ versus $H_{1}: \rho(k)\neq \quad 0 for\quad k\in{1,2,...,m}$. if $Q(m)>\chi_{\alpha}^{2}(m)$ we can reject null hypothethis($H_{0}$). Since our significance level is 5% and our p-value is more than 26% then we cannot reject null hypothesis and we can deduce that the daily time series is stationary
+
+```{r}
+Box.test(rw, lag=10, type='Ljung')
+```
+Since our significance level is 5% and our p-value is more than 11% then we cannot reject null hypothesis and we can deduce that the weekly time series is stationary
+
+```{r}
+Box.test(rm, lag=10, type='Ljung')
+```
+Since our significance level is 5% and our p-value is more than 73% then we cannot reject null hypothesis and we can deduce that the monthly time series is stationary
+
+## (f) Comment on the similarities and differences between returns at different frequenciesbased on your findings in (c) and (e).
+Base on the above results we can see that yearly time series is showing more stationary than daily and monthly. By comparing ACF, we can see that Monthly retrun is statistically more significant in being stationary 

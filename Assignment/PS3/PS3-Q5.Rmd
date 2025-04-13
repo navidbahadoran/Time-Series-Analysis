@@ -1,0 +1,145 @@
+---
+title: "PS3-Q5"
+output: pdf_document
+date: "2025-03-02"
+---
+
+## (Computer Exercise) Let us practice unit root tests on the following series. (All series have been seasonally adjusted.).
+
+```{r message = FALSE}
+library("quantmod")
+library(forecast)
+library(tseries)
+library(urca)
+library(ggplot2)
+```
+
+
+## (a) Series #1: Logarithm of US quarterly real GDP from 1947Q1 to 2019Q4. 
+```{r}
+getSymbols("GDP", src = "FRED")
+lgdp<-log(GDP)['/2019']
+```
+## i. Examine the time series plot and ACF of lgdp.
+```{r}
+plot(lgdp)
+```
+```{r}
+Acf(lgdp)
+```
+
+The time series and autocorrelation plot is showing non-stationary view. Specially Autocorrelation is showing high serially correlated time series that decays very slowly. 
+
+## ii. Perform the augmented Dickey-Fuller test of the null hypothesis that lgdp is difference stationary against the alternative that it is trend stationary.
+
+```{r}
+result <- ur.df(lgdp, type="trend",lag=6, selectlags = "AIC")
+summary(result) 
+```
+```{r}
+plot(result)
+```
+According the augmented Dickey-Fuller test result, we fail to reject the null hypothesis in favor of alternative hypothesis at the 5% significance level, which said the time series is not stationary or it is likely difference stationary.
+
+
+## Series #2: Growth rate of US quarterly real GDP from 1947Q2 to 2019Q4. Use the data in part (a) to generate the GDP growth series as follows:
+```{r}
+gdpgr <-100 * diff(lgdp)[-1]
+```
+## i. Examine the time series plot and ACF of gdpgr.
+```{r}
+plot(gdpgr)
+```
+```{r}
+acf(gdpgr)
+```
+Visually the difference times series looks stationary. Also, autocorrelation is showing that it is decreasing 
+
+## ii. Perform the augmented Dickey-Fuller test of the null hypothesis of a unit root.
+
+```{r}
+result <- ur.df(gdpgr, type="drift",  selectlags="AIC")
+summary(result) 
+```
+```{r}
+plot(result)
+```
+
+According the augmented Dickey-Fuller test result we can reject the null hypothesis in favor of alternative hypothesis at the 5% significance level which said the series is stationary.
+
+## iii. Based on your test results for lgdp and gdpgr, do you think it is appropriate to apply stationary ARMA models to the difference of log of real GDP?
+
+According the those test we can say that diff(lgdp) which is the difference of log of GDP is stationary and we can apply ARMA to model it. 
+
+## (c) Series #3: US quarterly inflation rate from 1960Q2 to 2019Q4. First retrieve the quarterly Consumer Price Index (CPI) series from FRED and then compute the inflation rate as the difference of logs.
+
+```{r}
+cpi <- getSymbols("CPALTT01USQ661S", src = "FRED", auto.assign = FALSE)
+inf <- 100 * diff(log(cpi))[-1]
+```
+## i. Examine the time series plot and ACF of inf.
+
+```{r}
+plot(inf)
+```
+
+```{r}
+acf(inf)
+```
+
+Visually we can say that the inf time series is not stationary. Also, Autocorrelation is showing highly serially correlated lags that decays slowly. 
+
+## ii. Perform the augmented Dickey-Fuller and KPSS tests to investigate whether inf is stationary.
+```{r}
+result <- ur.df(inf, type="drift",lags = 6,selectlags = "AIC")
+summary(result) 
+```
+
+```{r}
+plot(result)
+```
+From ADF test, we can reject null hypothesis, so the times series is likely stationary, which is in contrast with our visual observation.
+
+```{r}
+kpss.test(inf, "Level")
+```
+
+
+```{r}
+result <- ur.kpss(inf, type="mu", lags="short")
+summary(result)
+```
+From KPSS test, we can reject null hypothesis which said that time series is not stationary. 
+From these two tests, we can see ADF and KPSS are in contrast from each other, so we should conider more evidence.
+
+## iii. Perform the augmented Dickey-Fuller and KPSS tests to investigate whether the first difference of inf is stationary.
+
+
+```{r}
+dinf<-diff(inf)[-1]
+```
+
+```{r}
+plot(dinf)
+```
+```{r}
+acf(dinf)
+```
+Visually we can say that difference of inflation is stationary
+
+```{r}
+result<-ur.df(dinf,type="none")
+summary(result)
+```
+```{r}
+plot(result)
+```
+From ADF test, we can reject null hypothesis which said that our series likely is stationary
+
+```{r}
+result <-ur.kpss(dinf, , type="mu", lags="short")
+summary(result)
+```
+From KPSS test we fail to reject the null hypothesis, so the series is stationary. 
+## iv. In practice, many forecasters treat US inflation as I(1). Are your findings consistent with this view?
+Since both ADF and KPSS test are aligned in the results, we can say more strongly that inflation can be considdred as I(1).

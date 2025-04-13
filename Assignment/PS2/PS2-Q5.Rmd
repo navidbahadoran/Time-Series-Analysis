@@ -1,0 +1,133 @@
+---
+title: "PS2-Q5"
+output: pdf_document
+date: "2025-02-16"
+---
+
+## (Computer Exercise) Consider the US quarterly real GDP growth from 1947Q2 to 2019Q4. The data can be retrieved using the following code in R, or from the BEA website: <https://fred.stlouisfed.org/series/A191RL1Q225SBEA>.
+
+```{r message = FALSE}
+library('quantmod')
+library(forecast)
+library(ggplot2)
+```
+
+```{r}
+gdp.full <-getSymbols("A191RL1Q225SBEA", src = "FRED", auto.assign = FALSE)
+gdp <-gdp.full["/2019"]
+```
+
+## (a) Examine the time and ACF plots of the real GDP growth rates, gdp. Does the series look like stationary?
+
+```{r}
+plot(gdp)
+```
+
+The time series plot is not showing stationary view.
+
+```{r}
+acf(gdp)
+```
+
+Autocorrelation of GDP is decaying into confidence interval after lag 2, which is another reason of non-stationary time series.
+
+## (b) Estimate three candidate models, AR(1), MA(1), and ARMA(1,1), for gdp. For each model, write down the estimated equation and investigate whether the model is adequate by examining the time plot, ACF, and the Ljung-Box test statistic of the residuals. Comment: Note that in the arima() output, the estimated mean is labeled as “intercept”.
+```{r}
+fit_ar1<-arima(gdp, order=c(1,0,0))
+fit_ar1
+```
+$y_{t}-3.2217=0.3583(y_{t-1}-3.2217)+\epsilon_{t} \quad \epsilon_{t} \sim N(0,12.75)$
+```{r}
+checkresiduals(fit_ar1)
+```
+We can see almost all ACF of residual are within a confidence interval. Box test is showing p-value of 5.4% which is above significance level, and we cannot reject the null hypothesis. So AR(1) is adequate.
+```{r}
+fit_ma1<-arima(gdp, order=c(0,0,1))
+fit_ma1
+```
+$y_{t}-3.2268=\epsilon_{t}+0.267\epsilon_{t-1} \quad \epsilon_{t} \sim N(0,13.23)$
+
+```{r}
+checkresiduals(fit_ma1)
+```
+As we can see ACF of  residual of MA1 is very high in lag 2. Box test also is showing very small p-value which we can reject the null hypothesis. So MA(1) is not adequate
+```{r}
+fit_arma11<-arima(gdp, order=c(1,0,1))
+fit_arma11
+```
+$y_{t}-3.2188=0.5091(y_{t-1}-3.2188)+\epsilon_{t}-0.1697\epsilon_{t-1} \quad \epsilon_{t} \sim N(0,12.65)$
+```{r}
+checkresiduals(fit_arma11)
+```
+
+As we can see ACF of  residual of ARMA(1,1) is very high in lag 2. Box test also is showing very small p-value which we can reject the null hypothesis. So ARMA(1,1) is not adequate.
+
+
+## (c) Find the best AR model for gdp, including diagnostic checking. Write down the fitted model you end up choosing.Comment: I am giving you more flexibility in making modeling decisions as we progress. You should consider all the tools we have learned so far in selecting the best model, including the ACF, PACF, AIC, BIC, the auto.arima() function, and diagnostic checking. To simplify the exercise, consider the maximum lag pmax = 4 and ignore seasonality. When using auto.arima(), please configure the seasonal, max.p and max.q arguments appropriately.
+
+```{r}
+fit_ar=auto.arima(gdp, max.p=4, max.q=0, start.p=1, d=0, seasonal=FALSE,trace = FALSE,ic=c("aicc"))
+fit_ar
+```
+$y_{t}-3.2189=0.3322(y_{t-1}-3.2189)+0.1506(y_{t-2}-3.2189)-0.1198(y_{t-3}-3.2189)+\epsilon_{t} \quad \epsilon_{t} \sim N(0,12.57)$
+```{r echo=FALSE}
+checkresiduals(fit_ar)
+```
+
+
+We can see almost all ACF of residual are within a confidence interval. Box test is showing p-value of 17% which is above confidence coefficient, and we cannot reject the null hypothesis. So AR(3) is adequate.
+
+
+## d) Does the model imply the existence of business cycles? Explain. Compute the average length of the cycles if they are present. (You can use the polyroot() function in R to find zeros of a polynomial.)
+
+$(1-0.3322z-0.1506z^{2}+0.1198z^{3}=0$
+```{r}
+roots= polyroot(c(1,-0.3322,-0.1506,+0.1198))
+
+```
+Since we have complex root, model exhibit busines cycles.
+```{r}
+2*pi/atan(Im(roots[1])/Re(roots[1]))
+```
+Length of cycle is 10.41
+
+## (e) Predict the h-step-ahead GDP growth rates at the forecast origin 2019Q4, for h =1, 2, 3, 4. Find the 95% prediction intervals for these point forecasts.
+
+```{r}
+y_cast<-forecast(fit_ar, h=4,level = 0.95)
+y_cast
+```
+
+```{r}
+autoplot(y_cast)
+```
+
+
+## i. Predict the h-step-ahead GDP growth rates at the forecast origin 2018Q4, for h = 1, 2, 3, 4. Find the 95% prediction intervals for these point forecasts. Compare the forecasts with realized values of GDP growths.
+
+```{r}
+y_training<-window(gdp, end = as.Date("2018-12-31"))  # training data, or in-sample data
+y_test<-window(gdp, start = as.Date("2019-01-01"))
+```
+
+```{r}
+ar1 <- arima(y_training, order=c(3,0,0))
+autoplot(ar1)
+checkresiduals(ar1)
+```
+```{r}
+fcast_ar1 <- forecast(ar1, h = 4, level=0.95)
+autoplot(fcast_ar1) +
+  autolayer(as.ts(gdp), color = 1, lwd = 0.8) +
+  autolayer(fcast_ar1$mean, series = "Forecasts", lwd = 0.8) +
+  theme_bw()
+accuracy(fcast_ar1, y_test)
+```
+```{r}
+fcast_ar1
+```
+
+```{r}
+y_test
+```
+As we can see the point forecast and test gdp has significant error, however it stays in the confidence interval. I believe there are rooms for improving the model.

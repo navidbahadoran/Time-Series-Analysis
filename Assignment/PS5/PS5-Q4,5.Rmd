@@ -1,0 +1,247 @@
+---
+title: "PS5-Q4,5"
+output: pdf_document
+date: "2025-04-18"
+---
+
+## Q4 Consider the dynamic relationship between the quarterly real GDP and unemployment rate for the US. The levels of these two variables are contained in the file “quarterly.xls” under the names RGDP and Unemp, respectively..
+
+```{r message = FALSE}
+library(readxl)
+library(quantmod)
+library(urca)
+library(vars)
+library(tsDyn)
+```
+
+```{r}
+data <- read_excel("quarterly.xls")
+RGDP<- as.xts(ts(data$RGDP, start = c(1960, 1), frequency = 4))
+Unemp <- as.xts(ts(data$Unemp, start = c(1960, 1), frequency = 4))
+
+
+```
+
+
+## a) Define the growth rate of real DGP as the logarithmic change Δlgdpt = log (RGDPt)−log (RGDPt−1), and define the difference in the unemployment rate as Δurt = Unempt−Unempt−1. Determine whether Δlgdpt and Δurt are stationary. 
+```{r}
+dlgdp <- diff(log(RGDP))[-1]
+plot(dlgdp)
+```
+```{r}
+ur_dlgdp <- ur.df(dlgdp, type="drift", lags=4, selectlags="AIC")
+summary(ur_dlgdp)
+```
+
+Since the 22.75 is greater than 4.63 for 5% we can reject null hypothesis, so dlgdp is stationary.
+
+```{r}
+dunemp<-diff(Unemp)[-1]
+plot(dunemp)
+```
+```{r}
+ur_Unemp <- ur.df(dunemp, type="drift", lags=4, selectlags="AIC")
+summary(ur_Unemp)
+```
+
+Since the  21.4564 is greater than 4.63 for 5% we can reject null hypothesis, so Unemp is stationary.
+
+
+## (b)Build a VAR model for (Δlgdpt,Δurt)′ using the Akaike Information Criterion (AIC) to select the lag length. Write down the fitted model. Assess the adequacy of the model and explain your reasoning.
+
+```{r}
+vardata <- merge(dlgdp, dunemp)
+colnames(vardata) <- c("dlgdp", "dUnemp")
+plot(vardata)
+```
+```{r}
+VARselect(vardata, type="const")
+```
+From above test, the lag order is 2.
+
+```{r}
+VAR_fit <- VAR(vardata, p=2, type="const") # can choose lag order by "ic=" (but  
+                                        # must set "lag.max" simultaneously)
+summary(VAR_fit)
+```
+
+
+```{r}
+roots(VAR_fit, modulus=FALSE) # eigenvalues of the companion coefficient matrix
+```
+
+
+
+```{r}
+roots(VAR_fit) # modulus defaults to TRUE
+```
+Since the eigenvalues modulus are less than one, we can say that the model is stationary.
+
+
+```{r}
+res <- serial.test(VAR_fit, lags.pt=4, type="PT.adjusted")
+res
+```
+```{r}
+plot(res, names="dlgdp")
+```
+```{r}
+plot(res, names="dUnemp")
+```
+
+The serial test is showing that the residual does not have serially correlation. So the model is adequate.
+
+
+## (c) Using the model obtained in part (b), compute the 1-step through 4-step ahead forecasts for Δlgdpt and Δurt (assuming the forecast origin is the last data point).
+
+
+```{r}
+(fcast <- predict(VAR_fit, n.ahead=4))
+
+```
+
+```{r}
+plot(fcast)
+
+```
+
+
+
+```{r}
+fanchart(fcast)
+```
+
+## (d) Do the two series Δlgdpt and Δurt Granger cause each other?
+
+```{r}
+causality(VAR_fit, cause="dlgdp")
+```
+From P-value, we can reject null hypothesis, so dlgdp is Granger cause of dUnemp
+
+
+```{r}
+causality(VAR_fit, cause="dUnemp")
+```
+From P-value, we can reject null hypothesis, so dUnemp is Granger cause of dlgdp
+
+
+## (e) Plot the orthogonalized impulse response functions of the fitted model. Describe how each series responds to a shock in the other.
+
+
+
+```{r}
+irf_gdp <- irf(VAR_fit, impulse="dlgdp", response="dUnemp", n.ahead=20)
+plot(irf_gdp, ylab="dUnemp")
+
+```
+
+
+```{r}
+irf_spread <- irf(VAR_fit, impulse="dUnemp", response="dlgdp", n.ahead=20)
+plot(irf_spread, ylab="dlgdp")
+```
+
+```{r}
+plot(irf(VAR_fit)) # examine all four IRFs
+```
+
+## f) Perform forecast error variance decomposition. What proportions of the forecast error variance in the unemployment rate are explained by GDP growth in the short run and long run?
+
+
+```{r}
+fevd_result <- fevd(VAR_fit, n.ahead=12)
+fevd_result
+
+```
+```{r}
+cat("\nVariance Decomposition for Δur:\n")
+print(fevd_result$dUnemp)
+```
+
+
+```{r}
+plot(fevd_result)
+```
+
+## Q5. Retrieve monthly data for the following five U.S. Treasury interest rates from FRED using the quantmod package: 3-month (TB3MS), 6-month (TB6MS), 1-year (GS1), 5-year (GS5), and 10-year (GS10). Focus on the sample period from January 1981 to December 2024. Determine the number of cointegrating relationships among the five series using Johansen’s trace and maximum eigenvalue tests. Report the estimated cointegrating vector(s). Comment: For simplicity, assume all series are I(1) and skip formal unit root testing.
+
+```{r}
+# Retrieve monthly data from FRED
+symbols <- c("TB3MS", "TB6MS", "GS1", "GS5", "GS10")
+getSymbols(symbols, src = "FRED", from = "1981-01-01", to = "2024-12-31") 
+```
+
+
+```{r}
+# Merge data into a single xts object and handle missing values
+treasury_data <- na.omit(merge(TB3MS, TB6MS, GS1, GS5, GS10))
+treasury_data <- treasury_data["1981-01/2024-12"]
+```
+
+
+```{r}
+plot(treasury_data)
+addLegend("topright", legend.names = symbols,
+          lty=c(1,1), bg="white", bty="o")
+```
+
+```{r}
+lagselect <- VARselect(treasury_data, lag.max = 4, type = "const")
+lagselect$selection
+```
+We can see that VAR lag order is 3
+```{r}
+ctest_tr <- ca.jo(treasury_data, type  = "trace", ecdet = "const", K = 3, 
+                  spec = "transitory")
+summary(ctest_tr)
+```
+
+From trace test, we have 2 for order of integration.
+
+```{r}
+ctest_eig <- ca.jo(treasury_data, type  = "eigen", ecdet = "const", K = 3, 
+                   spec = "transitory")
+summary(ctest_eig)
+```
+from Max eigenvalue test we have 1 for order of cointegration. 
+
+I chose two for the order of integration.
+
+```{r}
+r<-2
+coint_vectors <- ctest_tr@V[, 1:r]
+colnames(coint_vectors) <- paste("Vector", 1:r, sep = "_")
+cat("\nEstimated Cointegrating Vector(s):\n")
+print(coint_vectors)
+```
+Above are cointegrated vectors
+
+```{r}
+VECM_model <- VECM(treasury_data, lag=1, r=2, estim = "ML", LRinclude = "none")
+summary(VECM_model)
+```
+
+```{r}
+cajorls_model <- cajorls(ctest_tr, r=2)  
+summary(cajorls_model$rlm)
+
+```
+```{r}
+VAR_model <- vec2var(ctest_tr, r=2)
+VAR_model
+```
+
+
+
+```{r}
+serial_test <- serial.test(VAR_model, lags.pt = 5, type = "PT.adjusted")
+serial_test
+
+```
+
+It seems the model is not adequate.
+
+
+
+
+
